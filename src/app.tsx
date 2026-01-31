@@ -28,9 +28,8 @@ import {
 
 // List of tools that require human confirmation
 // NOTE: this should match the tools that don't have execute functions in tools.ts
-const toolsRequiringConfirmation: (keyof typeof tools)[] = [
-  "getWeatherInformation"
-];
+// All study app tools have execute functions, so no confirmation is required
+const toolsRequiringConfirmation: (keyof typeof tools)[] = [];
 
 export default function Chat() {
   const [theme, setTheme] = useState<"dark" | "light">(() => {
@@ -201,21 +200,63 @@ export default function Chat() {
                   <div className="bg-[#F48120]/10 text-[#F48120] rounded-full p-3 inline-flex">
                     <RobotIcon size={24} />
                   </div>
-                  <h3 className="font-semibold text-lg">Welcome to AI Chat</h3>
+                  <h3 className="font-semibold text-lg">Welcome to Study Assistant</h3>
                   <p className="text-muted-foreground text-sm">
-                    Start a conversation with your AI assistant. Try asking
-                    about:
+                    Say "hi" to get started, or pick an option below.
                   </p>
+                  <p className="text-sm font-medium text-left">What you can do:</p>
                   <ul className="text-sm text-left space-y-2">
                     <li className="flex items-center gap-2">
                       <span className="text-[#F48120]">•</span>
-                      <span>Weather information for any city</span>
+                      <span><strong>Study a concept</strong> — I'll explain any topic with examples</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="text-[#F48120]">•</span>
-                      <span>Local time in different locations</span>
+                      <span><strong>Study for an exam</strong> — Get a study plan and deep coverage</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="text-[#F48120]">•</span>
+                      <span><strong>Quiz on something</strong> — Test your knowledge with practice questions</span>
                     </li>
                   </ul>
+                  <div className="flex flex-wrap gap-2 justify-center pt-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="rounded-full"
+                      onClick={() => setAgentInput("Hi")}
+                    >
+                      Say hi
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="rounded-full"
+                      onClick={() => setAgentInput("I want to study a concept")}
+                    >
+                      Study a concept
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="rounded-full"
+                      onClick={() => setAgentInput("I want to study for an exam")}
+                    >
+                      Study for an exam
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="rounded-full"
+                      onClick={() => setAgentInput("Quiz me on something")}
+                    >
+                      Quiz me
+                    </Button>
+                  </div>
                 </div>
               </Card>
             </div>
@@ -305,6 +346,39 @@ export default function Chat() {
                               toolsRequiringConfirmation.includes(
                                 toolName as keyof typeof tools
                               );
+
+                            // getUserContext: show output as main chat bubble (user data should be prominent)
+                            if (
+                              toolName === "getUserContext" &&
+                              part.state === "output-available" &&
+                              part.output != null
+                            ) {
+                              const output =
+                                typeof part.output === "string"
+                                  ? part.output
+                                  : JSON.stringify(part.output);
+                              return (
+                                <div
+                                  // biome-ignore lint/suspicious/noArrayIndexKey: using index is safe here as the array is static
+                                  key={`${toolCallId}-${i}`}
+                                  className="space-y-1"
+                                >
+                                  <Card className="p-3 rounded-md rounded-bl-none border-assistant-border bg-neutral-100 dark:bg-neutral-900">
+                                    <MemoizedMarkdown
+                                      id={`${m.id}-userContext-${i}`}
+                                      content={output}
+                                    />
+                                  </Card>
+                                  <p className="text-xs text-muted-foreground text-left">
+                                    {formatTime(
+                                      m.metadata?.createdAt
+                                        ? new Date(m.metadata.createdAt)
+                                        : new Date()
+                                    )}
+                                  </p>
+                                </div>
+                              );
+                            }
 
                             return (
                               <ToolInvocationCard
