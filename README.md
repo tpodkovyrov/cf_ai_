@@ -2,19 +2,19 @@
 
 ## Summary
 
-**What it is:** A chat-based AI study assistant that runs on Cloudflare. You talk to it in a browser; it can teach you topics, help you prep for exams, run quizzes, and track what you’ve learned.
+What it is: A chat-based AI study assistant that runs on Cloudflare. You talk to it in a browser; it can teach you topics, help you prep for exams, run quizzes, and track what you’ve learned.
 
-**How it works in short:**
+How it works in short:
 
-1. **You send a message** in the React chat UI. The request hits a Cloudflare Worker, which routes it to a **Durable Object** (one per chat session). That object holds your **SQLite** data: profile, preferences, knowledge graph, quiz history, and study sessions.
+1. You send a message in the React chat UI. The request hits a Cloudflare Worker, which routes it to a Durable Object (one per chat session). That object holds your SQLite data: profile, preferences, knowledge graph, quiz history, and study sessions.
 
-2. **The AI classifies your message:**
-   - **Conversational** (greetings, profile answers, “quiz me on X”, general questions) → one **streaming** reply with tools. The model can call tools in the same turn (e.g. save profile, run a quiz, answer a general question).
-   - **Learning** (“explain X”, “teach me Y”) → the assistant **plans** 1–10 steps, runs each step with the AI, then **combines** the answers and **adds the topic** to your knowledge graph at 50% mastery.
+2. The AI classifies your message:
+   - **Conversational** (greetings, profile answers, “quiz me on X”, general questions) → one streaming reply with tools. The model can call tools in the same turn (e.g. save profile, run a quiz, answer a general question).
+   - **Learning** (“explain X”, “teach me Y”) → the assistant plans 1–10 steps, runs each step with the AI, then combines the answers and adds the topic to your knowledge graph at 50% mastery.
 
-3. **AI and state:** All AI calls use **Workers AI** (no OpenAI key needed). Tools read/write the Durable Object’s SQLite so your progress is persisted per session.
+3. AI and state: All AI calls use Workers AI (no OpenAI key needed). Tools read/write the Durable Object’s SQLite so your progress is persisted per session.
 
-**In one sentence:** The app is a stateful, tool-using study assistant on Cloudflare that either answers in one streaming turn (conversational) or runs a multi-step learning plan and records what you learned.
+In one sentence: The app is a stateful, tool-using study assistant on Cloudflare that either answers in one streaming turn (conversational) or runs a multi-step learning plan and records what you learned.
 
 ---
 
@@ -38,17 +38,19 @@
 
 ## Overview
 
-- What it does: Chat-based study assistant. Users can:
-  1. Study a concept — multi-step explanations with optional knowledge tracking. Support user learning preference
-     2.Study for an exam — set exam name, depth, time; get a study plan and concepts to learn
-     3.Take a quiz — topic, number of questions, type (multiple choice / free response / mixed), hints on/off; results update mastery and weak areas.
-  2. Ask general questions about anything not realated to the studying
-  3. Review user weak knowledge areas
-  4. Get information about user(what info is stored)
-     7.Persistence Per-user state (profile, session preferences, knowledge, quiz history, study sessions) is stored in **Durable Object–backed SQLite** (one DB per chat session/DO instance).
-  5. AI**: Uses **Cloudflare Workers AI\*\* (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`) for all model calls (no OpenAI API key required in production). Intent classification, plan generation, step processing, general Q&A, and main chat all use this binding.
+- **What it does:** Chat-based study assistant. Users can:
+  1. **Study a concept** — Multi-step explanations with optional knowledge tracking; supports user learning preferences.
+  2. **Study for an exam** — Set exam name, depth, and time; get a study plan and concepts to learn.
+  3. **Take a quiz** — Choose topic, number of questions, type (multiple choice / free response / mixed), hints on/off; results update mastery and weak areas.
+  4. **Ask general questions** — About anything not related to studying.
+  5. **Review weak areas** — See topics that need more practice.
+  6. **Get stored info** — See what the app knows (profile, session preferences, knowledge, quiz history, study sessions).
 
-App flows works like this: Each user message is **classified** (CONVERSATIONAL vs LEARNING). Conversational uses a single **streaming** chat turn with tools. Learning uses a **plan** (1–10 steps), then steps are run sequentially; results are combined and the topic is auto-added to the knowledge graph at 50% mastery that will be updated later if user practice concept.
+- **Persistence:** Per-user state (profile, session preferences, knowledge, quiz history, study sessions) is stored in Durable Object–backed SQLite (one DB per chat session/DO instance).
+
+- **AI:** Uses Cloudflare Workers AI (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`) for all model calls (no OpenAI API key required in production). Used for intent classification, plan generation, step processing, general Q&A, and main chat.
+
+- **Flow:** Each user message is classified (CONVERSATIONAL vs LEARNING). **Conversational** → single streaming chat turn with tools. **Learning** → plan (1–10 steps), run steps sequentially, combine results, and auto-add the topic to the knowledge graph at 50% mastery (updated later when the user practices).
 
 ---
 
@@ -171,13 +173,11 @@ App flows works like this: Each user message is **classified** (CONVERSATIONAL v
 
 All tables live in the Durable Object’s SQLite. Created in **initTables()** on DO startup.
 
-| Table                   | Purpose                                                                                                                                                                                     |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **user_profile**        | Single row (id=1): name, major, year, preferred_learning_methods (JSON array), last_active.                                                                                                 |
-| **session_preferences** | Single row (id=1): goal (learn/exam/quiz), learn_topic/learn_concept, exam_name/exam_depth/exam_time_left, quiz_topic/quiz_num_questions/quiz_type/quiz_hints_allowed, onboarding_complete. |
-| **knowledge**           | Per (subject, topic): mastery_level, confidence, times_studied, times_quizzed, last_studied, last_quizzed, weak_areas (JSON), notes. UNIQUE(subject, topic).                                |
-| **quiz_history**        | One row per quiz: subject, topic, quiz_type, score, total_questions, correct_answers, missed_concepts (JSON), time_spent_seconds, hints_used, quiz_date.                                    |
-| **study_sessions**      | Session_type (learn/review/quiz/exam_prep), subject, topic, duration_minutes, summary, started_at, ended_at.                                                                                |
+| **user_profile** | Single row (id=1): name, major, year, preferred_learning_methods (JSON array), last_active.  
+| **session_preferences** | Single row (id=1): goal (learn/exam/quiz), learn_topic/learn_concept, exam_name/exam_depth/exam_time_left, quiz_topic/quiz_num_questions/quiz_type/quiz_hints_allowed, onboarding_complete.
+| **knowledge** | Per (subject, topic): mastery_level, confidence, times_studied, times_quizzed, last_studied, last_quizzed, weak_areas (JSON), notes. UNIQUE(subject, topic).  
+| **quiz_history** | One row per quiz: subject, topic, quiz_type, score, total_questions, correct_answers, missed_concepts (JSON), time_spent_seconds, hints_used, quiz_date.  
+| **study_sessions** | Session_type (learn/review/quiz/exam_prep), subject, topic, duration_minutes, summary, started_at, ended_at.
 
 Enums (in code and CHECK constraints where used): **Goal** (learn, exam, quiz), **LearningMethod** (examples, theory, practice, flashcards, summaries, socratic), **ExamDepth** (overview, moderate, deep), **QuizType** (multiple_choice, free_response, mixed), **SessionType**, **ResetType**.
 
@@ -187,18 +187,18 @@ Enums (in code and CHECK constraints where used): **Goal** (learn, exam, quiz), 
 
 Defined in **src/tools.ts** with Zod schemas. Every tool has an **execute** function (no human-in-the-loop in this app; `toolsRequiringConfirmation` in `app.tsx` is empty).
 
-| **answerGeneralQuestion** | Fallback for weather, facts, small talk. Calls Workers AI with GENERAL_QUESTION_SYSTEM; returns the model reply.  
-| **getUserContext** | Returns `formatUserContextForDisplay()`: profile, topics studied, weak areas, recent quizzes, quiz stats.  
-| **updateUserProfile** | Upserts name, major, year, preferredLearningMethods. Returns “Saved: …” plus next onboarding prompt (e.g. ask major/year).  
-| **updateSessionPreferences** | Upserts goal and branch-specific fields (learn/exam/quiz). Returns “Session saved.” plus next question or “start teaching/quiz”.
-| **updateKnowledge** | Upsert knowledge row: subject, topic, masteryLevel, confidence, incrementStudyCount, weakAreas, notes.  
-| **getKnowledge** | List knowledge, optional filter by subject.  
-| **getWeakAreas** | Topics with mastery &lt; 60 or confidence &lt; 50, up to limit.  
-| **recordQuizResult** | Insert quiz_history, then update knowledge (merge weak areas, weighted mastery). Returns formatted “Quiz recorded: …”.  
-| **getQuizHistory** | Recent quizzes, optional subject filter, limit.  
-| **startStudySession** | Insert study_sessions row, return sessionId.  
-| **endStudySession** | Set ended_at, summary, duration_minutes for sessionId.  
-| **resetProgress** | resetType: all knowledge | quizzes | sessions; requires userConfirmed. Deletes from the relevant tables.
+1. **`answerGeneralQuestion`** — Fallback for weather, facts, small talk. Calls Workers AI with GENERAL_QUESTION_SYSTEM; returns the model reply.
+2. **`getUserContext`** — Returns `formatUserContextForDisplay()`: profile, topics studied, weak areas, recent quizzes, quiz stats.
+3. **`updateUserProfile`** — Upserts name, major, year, preferredLearningMethods. Returns “Saved: …” plus next onboarding prompt (e.g. ask major/year).
+4. **`updateSessionPreferences`** — Upserts goal and branch-specific fields (learn/exam/quiz). Returns “Session saved.” plus next question or “start teaching/quiz”.
+5. **`updateKnowledge`** — Upsert knowledge row: subject, topic, masteryLevel, confidence, incrementStudyCount, weakAreas, notes.
+6. **`getKnowledge`** — List knowledge, optional filter by subject.
+7. **`getWeakAreas`** — Topics with mastery &lt; 60 or confidence &lt; 50, up to limit.
+8. **`recordQuizResult`** — Insert quiz_history, then update knowledge (merge weak areas, weighted mastery). Returns formatted “Quiz recorded: …”.
+9. **`getQuizHistory`** — Recent quizzes, optional subject filter, limit.
+10. **`startStudySession`** — Insert study_sessions row, return sessionId.
+11. **`endStudySession`** — Set ended_at, summary, duration_minutes for sessionId.
+12. **`resetProgress`** — resetType: all knowledge | quizzes | sessions; requires userConfirmed. Deletes from the relevant tables.
 
 Scheduling tools (`scheduleTask`, `getScheduledTasks`, `cancelScheduledTask`) are implemented in code but **not** exported in the `tools` object used by the agent (comment: “not relevant for study app”).
 
@@ -212,8 +212,8 @@ All in **src/prompts.ts**.
 2. **`PLAN_GENERATOR_*`** — Input = user prompt; output = JSON array of step strings (1–10).
 3. **`PROCESS_STEP_*`** — One step of the plan; includes step index, total steps, original prompt, previous steps.
 4. **`KNOWLEDGE_INFER_*`** — From a learning prompt, output JSON `{ "subject": "...", "topic": "..." }` for the knowledge graph.
-5. **`MAIN_SYSTEM_TEMPLATE`** / **`BASE_RULES`** — System prompt for the main chat: profile summary, missing profile fields, knowledge/weak/recent-quiz lines, tool usage rules (answerGeneralQuestion for anything that doesn’t fit, getUserContext, updateUserProfile, recordQuizResult, etc.), teaching style, quiz format.
-6. **`MISSING_PROFILE_LINE_TEMPLATE`**, **`KNOWLEDGE_NONE_YET`**, **`WEAK_AREAS_NONE`**, **`RECENT_QUIZZES_*`** — Injected into main system prompt.
+5. **`MAIN_SYSTEM_TEMPLATE`** | `BASE_RULES` — System prompt for the main chat: profile summary, missing profile fields, knowledge/weak/recent-quiz lines, tool usage rules (answerGeneralQuestion for anything that doesn’t fit, getUserContext, updateUserProfile, recordQuizResult, etc.), teaching style, quiz format.
+6. **`MISSING_PROFILE_LINE_TEMPLATE`**, `KNOWLEDGE_NONE_YET`, `WEAK_AREAS_NONE`, `RECENT_QUIZZES_*` — Injected into main system prompt.
 7. **`GENERAL_QUESTION_SYSTEM`** — System for answerGeneralQuestion (brief, helpful, no refusal).
 8. **`TOOL_DESC_*`** — Tool descriptions for the model.
 9. **`NEXT_ASK_*`** — Instructions returned after updateUserProfile / updateSessionPreferences (e.g. “NEXT: Ask what’s your major”).
